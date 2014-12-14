@@ -1,110 +1,137 @@
-import pymongo
-from bson.objectid import ObjectId
+import datetime
 
 from flask import Flask
+
 from flask.ext import admin
-
-from wtforms import form, fields
-
-from flask.ext.admin.form import Select2Widget
-from flask.ext.admin.contrib.pymongo import ModelView, filters
-from flask.ext.admin.model.fields import InlineFormField, InlineFieldList
+from flask.ext.mongoengine import MongoEngine
+from flask.ext.admin.form import rules
+from flask.ext.admin.contrib.mongoengine import ModelView
 
 # Create application
 app = Flask(__name__)
 
 # Create dummy secrey key so we can use sessions
 app.config['SECRET_KEY'] = '123456790'
+app.config['MONGODB_SETTINGS'] = {'DB': 'ModelDB'}
 
 # Create models
-conn = pymongo.Connection()
-db = conn['ModelDB']
+db = MongoEngine()
+db.init_app(app)
 
 
-# User admin
-class InnerForm(form.Form):
-    name = fields.TextField('Name')
-    test = fields.TextField('Test')
+# Define mongoengine documents
+class User(db.Document):
+    name = db.StringField(max_length=40)
+    tags = db.ListField(db.ReferenceField('Tag'))
+    password = db.StringField(max_length=40)
+
+    def __unicode__(self):
+        return self.name
 
 
-class ToyForm(form.Form):
-    name = fields.TextField('name')
-    thumbnail = fields.TextField('thumbnail')
-    image = fields.TextField('image')
+class Todo(db.Document):
+    title = db.StringField(max_length=60)
+    text = db.StringField()
+    done = db.BooleanField(default=False)
+    pub_date = db.DateTimeField(default=datetime.datetime.now)
+    user = db.ReferenceField(User, required=False)
 
-    # Inner form
-    inner = InlineFormField(InnerForm)
+    # Required for administrative interface
+    def __unicode__(self):
+        return self.title
 
-    # Form list
-    form_list = InlineFieldList(InlineFormField(InnerForm))
+
+class Tag(db.Document):
+    name = db.StringField(max_length=10)
+
+    def __unicode__(self):
+        return self.name
+
+
+class Comment(db.EmbeddedDocument):
+    name = db.StringField(max_length=20, required=True)
+    value = db.StringField(max_length=20)
+    tag = db.ReferenceField(Tag)
+
+
+class Post(db.Document):
+    name = db.StringField(max_length=20, required=True)
+    value = db.StringField(max_length=20)
+    inner = db.ListField(db.EmbeddedDocumentField(Comment))
+    lols = db.ListField(db.StringField(max_length=20))
+
+
+class File(db.Document):
+    name = db.StringField(max_length=20)
+    data = db.FileField()
+
+class Image(db.Document):
+    name = db.StringField(max_length=20)
+    image = db.ImageField(thumbnail_size=(100, 100, True))
+
+    def __unicode__(self):
+        return self.name
+
+class EmImage(db.EmbeddedDocument):
+#    image = db.ReferenceField(Image)
+    name = db.StringField(max_length=200)
+    image = db.ImageField(thumbnail_size=(100,100,True))
+
+class EmFile(db.EmbeddedDocument):
+#    gcodeFile = db.ReferenceField(File)
+    name = db.StringField(max_length=200)
+    data = db.FileField()
+
+class Toy(db.Document):
+    name = db.StringField(max_length = 200)
+    images = db.ListField(db.EmbeddedDocumentField(EmImage))
+    gcode = db.ListField(db.EmbeddedDocumentField(EmFile))
+#    thumbnail = db.ReferenceField(Image)
 
 
 class ToyView(ModelView):
-    column_list = ('name', 'thumbnail', 'image')
-    column_sortable_list = ('name')
+    column_filters = ['name']
+    column_searchable_list = ('name','images','thumbnail')
 
-    form = ToyForm
+# Customized admin views
+class UserView(ModelView):
+    column_filters = ['name']
+
+    column_searchable_list = ('name', 'password')
+
+    form_ajax_refs = {
+        'tags': {
+            'fields': ('name',)
+        }
+    }
 
 
-# Tweet view
-class TweetForm(form.Form):
-    name = fields.TextField('Name')
-    user_id = fields.SelectField('User', widget=Select2Widget())
-    text = fields.TextField('Text')
+class TodoView(ModelView):
+    column_filters = ['done']
 
-    testie = fields.BooleanField('Test')
+    form_ajax_refs = {
+        'user': {
+            'fields': ['name']
+        }
+    }
 
 
-class TweetView(ModelView):
-    column_list = ('name', 'user_name', 'text')
-    column_sortable_list = ('name', 'text')
-
-    column_filters = (filters.FilterEqual('name', 'Name'),
-                      filters.FilterNotEqual('name', 'Name'),
-                      filters.FilterLike('name', 'Name'),
-                      filters.FilterNotLike('name', 'Name'),
-                      filters.BooleanEqualFilter('testie', 'Testie'))
-
-    column_searchable_list = ('name', 'text')
-
-    form = TweetForm
-
-    def get_list(self, *args, **kwargs):
-        count, data = super(TweetView, self).get_list(*args, **kwargs)
-
-        # Grab user names
-        query = {'_id': {'$in': [x['user_id'] for x in data]}}
-        users = db.user.find(query, fields=('name',))
-
-        # Contribute user names to the models
-        users_map = dict((x['_id'], x['name']) for x in users)
-
-        for item in data:
-            item['user_name'] = users_map.get(item['user_id'])
-
-        return count, data
-
-    # Contribute list of user choices to the forms
-    def _feed_user_choices(self, form):
-        users = db.user.find(fields=('name',))
-        form.user_id.choices = [(str(x['_id']), x['name']) for x in users]
-        return form
-
-    def create_form(self):
-        form = super(TweetView, self).create_form()
-        return self._feed_user_choices(form)
-
-    def edit_form(self, obj):
-        form = super(TweetView, self).edit_form(obj)
-        return self._feed_user_choices(form)
-
-    # Correct user_id reference before saving
-    def on_model_change(self, form, model):
-        user_id = model.get('user_id')
-        model['user_id'] = ObjectId(user_id)
-
-        return model
-
+class PostView(ModelView):
+    form_subdocuments = {
+        'inner': {
+            'form_subdocuments': {
+                None: {
+                    # Add <hr> at the end of the form
+                    'form_rules': ('name', 'tag', 'value', rules.HTML('<hr>')),
+                    'form_widget_args': {
+                        'name': {
+                            'style': 'color: red'
+                        }
+                    }
+                }
+            }
+        }
+    }
 
 # Flask views
 @app.route('/')
@@ -114,11 +141,16 @@ def index():
 
 if __name__ == '__main__':
     # Create admin
-    admin = admin.Admin(app, name='ModelAdmin')
+    admin = admin.Admin(app, 'Example: MongoEngine')
 
     # Add views
-    admin.add_view(ToyView(db.toy, 'Model'))
-#    admin.add_view(TweetView(db.tweet, 'Tweets'))
+    admin.add_view(UserView(User))
+    admin.add_view(TodoView(Todo))
+    admin.add_view(ModelView(Tag))
+    admin.add_view(PostView(Post))
+    admin.add_view(ModelView(File))
+    admin.add_view(ModelView(Image))
+    admin.add_view(ModelView(Toy))
 
     # Start app
     app.run(debug=True)
