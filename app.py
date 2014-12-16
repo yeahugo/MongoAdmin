@@ -85,6 +85,7 @@ class EmFile(db.EmbeddedDocument):
 class Toy(db.Document):
     name = db.StringField(max_length = 200)
     images = db.ListField(db.EmbeddedDocumentField(EmImage))
+    thumbnail = db.ListField(db.EmbeddedDocumentField(EmImage))
     gcode = db.ListField(db.EmbeddedDocumentField(EmFile))
 #    thumbnail = db.ReferenceField(Image)
 
