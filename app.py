@@ -20,46 +20,6 @@ db.init_app(app)
 
 
 # Define mongoengine documents
-class User(db.Document):
-    name = db.StringField(max_length=40)
-    tags = db.ListField(db.ReferenceField('Tag'))
-    password = db.StringField(max_length=40)
-
-    def __unicode__(self):
-        return self.name
-
-
-class Todo(db.Document):
-    title = db.StringField(max_length=60)
-    text = db.StringField()
-    done = db.BooleanField(default=False)
-    pub_date = db.DateTimeField(default=datetime.datetime.now)
-    user = db.ReferenceField(User, required=False)
-
-    # Required for administrative interface
-    def __unicode__(self):
-        return self.title
-
-
-class Tag(db.Document):
-    name = db.StringField(max_length=10)
-
-    def __unicode__(self):
-        return self.name
-
-
-class Comment(db.EmbeddedDocument):
-    name = db.StringField(max_length=20, required=True)
-    value = db.StringField(max_length=20)
-    tag = db.ReferenceField(Tag)
-
-
-class Post(db.Document):
-    name = db.StringField(max_length=20, required=True)
-    value = db.StringField(max_length=20)
-    inner = db.ListField(db.EmbeddedDocumentField(Comment))
-    lols = db.ListField(db.StringField(max_length=20))
-
 
 class File(db.Document):
     name = db.StringField(max_length=20)
@@ -82,58 +42,32 @@ class EmFile(db.EmbeddedDocument):
     name = db.StringField(max_length=200)
     data = db.FileField()
 
+class Catalog(db.Document):
+    name = db.StringField(max_length = 200)
+    def __unicode__(self):
+        return self.name
+
 class Toy(db.Document):
     name = db.StringField(max_length = 200)
+    print_time = db.StringField(max_length = 50)
+    object_size = db.StringField(max_length = 50)
+    file_size = db.StringField(max_length = 50)
+    parts_num = db.IntField()
+    catalog = db.ReferenceField(Catalog)
+    description = db.StringField(max_length = 10000)
     images = db.ListField(db.EmbeddedDocumentField(EmImage))
     thumbnail = db.ListField(db.EmbeddedDocumentField(EmImage))
     gcode = db.ListField(db.EmbeddedDocumentField(EmFile))
-#    thumbnail = db.ReferenceField(Image)
 
 
 class ToyView(ModelView):
     column_filters = ['name']
-    column_searchable_list = ('name','images','thumbnail')
+#    column_searchable_list = ('name')
 
-# Customized admin views
-class UserView(ModelView):
+class CatalogView(ModelView):
     column_filters = ['name']
 
-    column_searchable_list = ('name', 'password')
-
-    form_ajax_refs = {
-        'tags': {
-            'fields': ('name',)
-        }
-    }
-
-
-class TodoView(ModelView):
-    column_filters = ['done']
-
-    form_ajax_refs = {
-        'user': {
-            'fields': ['name']
-        }
-    }
-
-
-class PostView(ModelView):
-    form_subdocuments = {
-        'inner': {
-            'form_subdocuments': {
-                None: {
-                    # Add <hr> at the end of the form
-                    'form_rules': ('name', 'tag', 'value', rules.HTML('<hr>')),
-                    'form_widget_args': {
-                        'name': {
-                            'style': 'color: red'
-                        }
-                    }
-                }
-            }
-        }
-    }
-
+# Customized admin views
 # Flask views
 @app.route('/')
 def index():
@@ -142,16 +76,13 @@ def index():
 
 if __name__ == '__main__':
     # Create admin
-    admin = admin.Admin(app, 'Example: MongoEngine')
+    admin = admin.Admin(app, 'Toy Model Admin')
 
     # Add views
-    admin.add_view(UserView(User))
-    admin.add_view(TodoView(Todo))
-    admin.add_view(ModelView(Tag))
-    admin.add_view(PostView(Post))
-    admin.add_view(ModelView(File))
-    admin.add_view(ModelView(Image))
+#    admin.add_view(ModelView(EmFile))
+#    admin.add_view(ModelView(EmImage))
     admin.add_view(ModelView(Toy))
+    admin.add_view(ModelView(Catalog))
 
     # Start app
-    app.run(debug=True)
+    app.run(host='0.0.0.0')
