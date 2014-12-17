@@ -62,6 +62,7 @@ class Toy(db.Document):
 
 class ToyView(ModelView):
     column_filters = ['name']
+    column_list = ('name', 'print_time','object_size','file_size')
 #    column_searchable_list = ('name')
 
 class CatalogView(ModelView):
@@ -73,7 +74,6 @@ class CatalogView(ModelView):
 def index():
     return '<a href="/admin/">Click me to get to Admin!</a>'
 
-
 if __name__ == '__main__':
     # Create admin
     admin = admin.Admin(app, 'Toy Model Admin')
@@ -81,8 +81,8 @@ if __name__ == '__main__':
     # Add views
 #    admin.add_view(ModelView(EmFile))
 #    admin.add_view(ModelView(EmImage))
-    admin.add_view(ModelView(Toy))
+    admin.add_view(ToyView(Toy))
     admin.add_view(ModelView(Catalog))
 
     # Start app
-    app.run(host='0.0.0.0')
+    app.run()
