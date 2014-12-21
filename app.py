@@ -6,9 +6,12 @@ from flask.ext import admin
 from flask.ext.mongoengine import MongoEngine
 from flask.ext.admin.form import rules
 from flask.ext.admin.contrib.mongoengine import ModelView
+from werkzeug.contrib.fixers import ProxyFix
 
 # Create application
 app = Flask(__name__)
+
+app.wsgi_app = ProxyFix(app.wsgi_app)
 
 # Create dummy secrey key so we can use sessions
 app.config['SECRET_KEY'] = '123456790'
@@ -17,7 +20,6 @@ app.config['MONGODB_SETTINGS'] = {'DB': 'ModelDB'}
 # Create models
 db = MongoEngine()
 db.init_app(app)
-
 
 # Define mongoengine documents
 
@@ -63,6 +65,7 @@ class Toy(db.Document):
 class ToyView(ModelView):
     column_filters = ['name']
     column_list = ('name', 'print_time','object_size','file_size')
+
 #    column_searchable_list = ('name')
 
 class CatalogView(ModelView):
@@ -70,14 +73,14 @@ class CatalogView(ModelView):
 
 # Customized admin views
 # Flask views
-@app.route('/')
+@app.route('/index')
 def index():
+    return redirect('admin')
     return '<a href="/admin/">Click me to get to Admin!</a>'
 
 if __name__ == '__main__':
     # Create admin
     admin = admin.Admin(app, 'Toy Model Admin')
-
     # Add views
 #    admin.add_view(ModelView(EmFile))
 #    admin.add_view(ModelView(EmImage))
@@ -85,4 +88,4 @@ if __name__ == '__main__':
     admin.add_view(ModelView(Catalog))
 
     # Start app
-    app.run()
+    app.run('0.0.0.0')
