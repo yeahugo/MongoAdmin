@@ -7,6 +7,10 @@ from flask.ext.mongoengine import MongoEngine
 from flask.ext.admin.form import rules
 from flask.ext.admin.contrib.mongoengine import ModelView
 from werkzeug.contrib.fixers import ProxyFix
+from bson.objectid import ObjectId
+import random
+import hashlib
+import os
 
 # Create application
 app = Flask(__name__)
@@ -34,14 +38,11 @@ class Image(db.Document):
     def __unicode__(self):
         return self.name
 
-class EmImage(db.EmbeddedDocument):
-#    image = db.ReferenceField(Image)
-    name = db.StringField(max_length=200)
+class EmImage(db.EmbeddedDocument,db.Document):
+#    image_id = db.ObjectIdField(unique=True)
     image = db.ImageField(thumbnail_size=(100,100,True))
 
 class EmFile(db.EmbeddedDocument):
-#    gcodeFile = db.ReferenceField(File)
-    name = db.StringField(max_length=200)
     data = db.FileField()
 
 class Catalog(db.Document):
@@ -66,8 +67,6 @@ class ToyView(ModelView):
     column_filters = ['name']
     column_list = ('name', 'print_time','object_size','file_size')
 
-#    column_searchable_list = ('name')
-
 class CatalogView(ModelView):
     column_filters = ['name']
 
@@ -88,4 +87,5 @@ if __name__ == '__main__':
     admin.add_view(ModelView(Catalog))
 
     # Start app
+    app.debug = True
     app.run('0.0.0.0')
